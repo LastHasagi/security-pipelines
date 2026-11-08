@@ -149,7 +149,7 @@ jobs:
           falhou=0
           while read -r contexto dockerfile; do
             [ -z "$contexto" ] && continue
-            nome=$(echo "$dockerfile" | tr '/.A-Z' '--a-z')
+            nome=$(echo "$dockerfile" | tr '/.' '--' | tr 'A-Z' 'a-z')
             docker build -q -t "scan/$nome" -f "$dockerfile" "$contexto" > /dev/null
             docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$HOME/.cache/trivy:/root/.cache/trivy" \
               aquasec/trivy:0.69.3 image --quiet --ignore-unfixed --exit-code 1 --format json \
