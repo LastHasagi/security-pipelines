@@ -6,6 +6,7 @@ GitHub Actions reutilizáveis de segurança. Este repo guarda só os workflows: 
 |---|---|---|
 | `scan-codigo.yml` | segredos no histórico, código e dependências | gitleaks, semgrep, pip-audit, npm audit |
 | `pentest-web.yml` | pentest dinâmico com ou sem login | ZAP, nuclei |
+| `corrige-dependencias.yml` | sobe as libs com CVE e abre PR | uv, npm audit fix, gh |
 
 ## Uso
 
@@ -41,6 +42,24 @@ jobs:
     secrets:
       login_json: ${{ secrets.PENTEST_LOGIN_JSON }}
 ```
+
+Para corrigir sozinho quando o scan achar CVE no main:
+
+```yaml
+  corrige:
+    needs: scan
+    if: failure() && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    uses: LastHasagi/security-pipelines/.github/workflows/corrige-dependencias.yml@<sha>
+    with:
+      dir_node: web
+      workflows_ci: ci.yml seguranca.yml
+```
+
+Ligue em Settings > Actions "Allow GitHub Actions to create and approve pull requests", e ponha `workflow_dispatch` nos workflows de `workflows_ci`: PR aberto pelo `GITHUB_TOKEN` não dispara CI sozinho. Só versão compatível sobe; o que pedir major fica no aviso do scan.
 
 O plano do ZAP é do repo que chama, porque as rotas de cada sistema são diferentes. Ele lê a URL em `${ALVO}` e precisa gerar `relatorios/zap.json`.
 

@@ -1,0 +1,67 @@
+# Corrige CVE das dependências e abre PR. Chame quando o scan-codigo falhar no main.
+# Só sobe versão compatível (sem `--force`): o que pedir major fica no aviso do scan.
+name: corrige-dependencias
+
+on:
+  workflow_call:
+    inputs:
+      dir_node:
+        description: Pasta com package-lock.json. Vazio pula o npm.
+        type: string
+        default: ""
+      workflows_ci:
+        description: Workflows do repo que chama para rodar na branch, separados por espaço.
+        type: string
+        default: ""
+
+# Quem chama precisa dar: contents: write, pull-requests: write, actions: write.
+# E ligar em Settings > Actions "Allow GitHub Actions to create and approve pull requests".
+
+jobs:
+  corrige:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      BRANCH: seguranca/cves
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        if: hashFiles('uv.lock') != ''
+      - name: python
+        if: hashFiles('uv.lock') != ''
+        run: |
+          uv export --frozen --no-dev --no-hashes --no-emit-project -o "$RUNNER_TEMP/req.txt" -q
+          uvx pip-audit==2.10.1 -r "$RUNNER_TEMP/req.txt" --no-deps --disable-pip \
+            -f json -o "$RUNNER_TEMP/pip-audit.json" || true
+          for pacote in $(jq -r '.dependencies[] | select(.vulns | length > 0) | .name' "$RUNNER_TEMP/pip-audit.json"); do
+            uv lock --upgrade-package "$pacote"
+          done
+      - name: npm
+        if: inputs.dir_node != ''
+        working-directory: ${{ inputs.dir_node }}
+        run: npm audit fix --omit=dev --package-lock-only || true
+      - name: pr
+        env:
+          WORKFLOWS_CI: ${{ inputs.workflows_ci }}
+        run: |
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "Nenhuma CVE com correção compatível: precisa de mão (ver o aviso do scan)." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$BRANCH"
+          git commit -am "fix(deps): corrige cves das dependencias"
+          # Branch fixa: a correção nova substitui a anterior em vez de empilhar PR.
+          git push -f origin "$BRANCH"
+          if [ -z "$(gh pr list --head "$BRANCH" --state open --json number -q '.[].number')" ]; then
+            gh pr create --base "${{ github.event.repository.default_branch }}" --head "$BRANCH" \
+              --title "fix(deps): corrige cves das dependencias" \
+              --body "Aberto pelo corrige-dependencias depois do scan achar CVE. Arquivos: $(git diff --name-only HEAD~1 | tr '\n' ' ')"
+          fi
+          # PR aberto pelo GITHUB_TOKEN não dispara o CI; workflow_dispatch dispara.
+          for wf in $WORKFLOWS_CI; do
+            gh workflow run "$wf" --ref "$BRANCH"
+          done
+          echo "PR de correção em \`$BRANCH\`." >> "$GITHUB_STEP_SUMMARY"

@@ -99,13 +99,25 @@ jobs:
           npm audit --omit=dev --json > "$raiz/relatorios/npm-audit.json"
       - if: always()
         run: |
+          # Cada CVE vira linha no resumo e anotação ::error:: na página do run.
           if [ -f relatorios/pip-audit.json ]; then
             jq -r '"pip-audit - \([.dependencies[].vulns[]?] | length) vulnerabilidades"' \
               relatorios/pip-audit.json >> "$GITHUB_STEP_SUMMARY"
+            jq -r '.dependencies[] | select(.vulns | length > 0)
+              | "\(.name) \(.version): \([.vulns[].id] | join(", ")) - corrige em \([.vulns[].fix_versions[]] | unique | join(", ") | if . == "" then "sem versao" else . end)"' \
+              relatorios/pip-audit.json | while read -r linha; do
+                echo "- $linha" >> "$GITHUB_STEP_SUMMARY"; echo "::error title=CVE python::$linha"
+              done
           fi
           if [ -f relatorios/npm-audit.json ]; then
             jq -r '"npm audit - \(.metadata.vulnerabilities.total) vulnerabilidades"' \
               relatorios/npm-audit.json >> "$GITHUB_STEP_SUMMARY"
+            jq -r '.vulnerabilities | to_entries[]
+              | .value.via as $via
+              | "\(.key) (\(.value.severity)): \([$via[] | objects | .url] | unique | join(", ") | if . == "" then "via \([$via[] | strings] | join(", "))" else . end)"' \
+              relatorios/npm-audit.json | while read -r linha; do
+                echo "- $linha" >> "$GITHUB_STEP_SUMMARY"; echo "::error title=CVE npm::$linha"
+              done
           fi
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
