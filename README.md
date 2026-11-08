@@ -4,7 +4,7 @@ GitHub Actions reutilizáveis de segurança. Este repo guarda só os workflows: 
 
 | Workflow | O que faz | Ferramentas |
 |---|---|---|
-| `scan-codigo.yml` | segredos no histórico, código e dependências | gitleaks, semgrep, pip-audit, npm audit |
+| `scan-codigo.yml` | segredos no histórico, código, dependências e imagens Docker | gitleaks, semgrep, pip-audit, npm audit, trivy |
 | `pentest-web.yml` | pentest dinâmico com ou sem login | ZAP, nuclei |
 | `corrige-dependencias.yml` | sobe as libs com CVE e abre PR | uv, npm audit fix, gh |
 
@@ -22,6 +22,9 @@ jobs:
     uses: LastHasagi/security-pipelines/.github/workflows/scan-codigo.yml@<sha>
     with:
       dir_node: web
+      imagens: |
+        . docker/Dockerfile.api
+        web web/Dockerfile
       bloquear: false
 ```
 
