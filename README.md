@@ -8,6 +8,12 @@ GitHub Actions reutilizáveis de segurança. Este repo guarda só os workflows: 
 | `pentest-web.yml` | pentest dinâmico com ou sem login | ZAP, nuclei |
 | `corrige-dependencias.yml` | sobe as libs com CVE e abre PR | uv, npm audit fix, gh |
 
+## Modelos
+
+| Modelo | Para quê |
+|---|---|
+| [`modelos/matriz-de-acesso.md`](modelos/matriz-de-acesso.md) | matriz papel × recurso × ação para provar Broken Access Control, que o ZAP não acha. Copie para o repo privado do sistema e preencha |
+
 ## Uso
 
 Fixe sempre um commit, nunca `@main`.
